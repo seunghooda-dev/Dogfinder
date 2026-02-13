@@ -1620,7 +1620,7 @@ class DogFinderApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const seed = Color(0xFFF28C28);
+    const seed = Color(0xFFFF8A1F);
     final baseTheme = ThemeData(
       useMaterial3: true,
       colorScheme: ColorScheme.fromSeed(
@@ -1628,66 +1628,83 @@ class DogFinderApp extends StatelessWidget {
         brightness: Brightness.light,
       ),
     );
-    final textTheme = GoogleFonts.notoSansKrTextTheme(baseTheme.textTheme);
+    final textTheme = GoogleFonts.notoSansKrTextTheme(baseTheme.textTheme).copyWith(
+      headlineSmall: GoogleFonts.notoSansKr(fontWeight: FontWeight.w800, letterSpacing: -0.3),
+      titleLarge: GoogleFonts.notoSansKr(fontWeight: FontWeight.w800, letterSpacing: -0.2),
+      titleMedium: GoogleFonts.notoSansKr(fontWeight: FontWeight.w700, letterSpacing: -0.1),
+      labelLarge: GoogleFonts.notoSansKr(fontWeight: FontWeight.w700),
+    );
     return StoreScope(
       store: store,
       child: MaterialApp(
         title: "Dog Finder MVP",
         theme: baseTheme.copyWith(
-          scaffoldBackgroundColor: const Color(0xFFFAF7F2),
+          scaffoldBackgroundColor: const Color(0xFFF7F8FA),
           textTheme: textTheme,
           primaryTextTheme: GoogleFonts.notoSansKrTextTheme(baseTheme.primaryTextTheme),
           appBarTheme: AppBarTheme(
             centerTitle: false,
             elevation: 0,
             scrolledUnderElevation: 0,
-            backgroundColor: const Color(0xFFFAF7F2),
+            backgroundColor: Colors.white,
             surfaceTintColor: Colors.transparent,
             foregroundColor: const Color(0xFF1F1F1F),
             titleTextStyle: GoogleFonts.notoSerifKr(
-              fontSize: 21,
-              fontWeight: FontWeight.w700,
+              fontSize: 22,
+              fontWeight: FontWeight.w800,
               color: const Color(0xFF1F1F1F),
             ),
           ),
           navigationBarTheme: NavigationBarThemeData(
-            height: 72,
-            backgroundColor: const Color(0xFFFEFBF6),
+            height: 76,
+            backgroundColor: Colors.white,
             elevation: 0,
+            indicatorColor: const Color(0xFFFFE8CF),
+            iconTheme: WidgetStateProperty.resolveWith((states) {
+              final selected = states.contains(WidgetState.selected);
+              return IconThemeData(
+                color: selected ? const Color(0xFFEF7F1A) : const Color(0xFF8A8F99),
+                size: 23,
+              );
+            }),
             labelTextStyle: WidgetStateProperty.resolveWith((states) {
               final selected = states.contains(WidgetState.selected);
               return GoogleFonts.notoSansKr(
                 fontSize: 12,
+                color: selected ? const Color(0xFFEF7F1A) : const Color(0xFF8A8F99),
                 fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
               );
             }),
           ),
           cardTheme: CardThemeData(
-            color: const Color(0xFFFFFEFC),
+            color: Colors.white,
             elevation: 0,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(18),
-              side: BorderSide(color: baseTheme.colorScheme.outline.withValues(alpha: 0.22)),
+              borderRadius: BorderRadius.circular(22),
+              side: BorderSide(color: baseTheme.colorScheme.outline.withValues(alpha: 0.16)),
             ),
           ),
           inputDecorationTheme: InputDecorationTheme(
             filled: true,
-            fillColor: const Color(0xFFFFFEFC),
+            fillColor: Colors.white,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide(color: baseTheme.colorScheme.outline.withValues(alpha: 0.3)),
+              borderSide: BorderSide(color: baseTheme.colorScheme.outline.withValues(alpha: 0.2)),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide(color: baseTheme.colorScheme.outline.withValues(alpha: 0.3)),
+              borderSide: BorderSide(color: baseTheme.colorScheme.outline.withValues(alpha: 0.2)),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide(color: const Color(0xFF222222), width: 1.2),
+              borderSide: BorderSide(color: const Color(0xFFEF7F1A), width: 1.4),
             ),
           ),
+          dividerColor: const Color(0xFFE9ECF1),
           floatingActionButtonTheme: const FloatingActionButtonThemeData(
             shape: StadiumBorder(),
+            backgroundColor: Color(0xFF8FE3B5),
+            foregroundColor: Color(0xFF133A2A),
           ),
         ),
         home: const Shell(),
@@ -1835,10 +1852,17 @@ class _NearbyTabState extends State<NearbyTab> {
 
     return Scaffold(
       appBar: AppBar(
+        titleSpacing: 14,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text("근처 제보"),
+            Text(
+              "PAWINHAND",
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: const Color(0xFFEF7F1A),
+                    letterSpacing: 0.2,
+                  ),
+            ),
             Text(
               "서울 강남구 · ${radiusKm.toStringAsFixed(0)}km 반경",
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -1934,14 +1958,25 @@ class _NearbyTabState extends State<NearbyTab> {
         onRefresh: () => _syncNow(store),
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(14, 8, 14, 100),
+          padding: const EdgeInsets.fromLTRB(14, 10, 14, 100),
           children: [
             Container(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+              padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(18),
-                color: const Color(0xFFFFFEFC),
-                border: Border.all(color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.22)),
+                borderRadius: BorderRadius.circular(24),
+                gradient: const LinearGradient(
+                  colors: [Color(0xFFFFF1DF), Color(0xFFFFF8F0), Color(0xFFE7F1FF)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                border: Border.all(color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.16)),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x12000000),
+                    blurRadius: 18,
+                    offset: Offset(0, 8),
+                  ),
+                ],
               ),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1957,7 +1992,10 @@ class _NearbyTabState extends State<NearbyTab> {
                         const SizedBox(height: 6),
                         Text(
                           "현재 반경 ${radiusKm.toStringAsFixed(0)}km 내 ${all.length}건",
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: -0.2,
+                              ),
                         ),
                         const SizedBox(height: 6),
                         Text(
@@ -1971,13 +2009,13 @@ class _NearbyTabState extends State<NearbyTab> {
                   ),
                   const SizedBox(width: 10),
                   Container(
-                    width: 44,
-                    height: 44,
+                    width: 50,
+                    height: 50,
                     decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.surfaceContainerHigh,
-                      borderRadius: BorderRadius.circular(12),
+                      color: Colors.white.withValues(alpha: 0.85),
+                      borderRadius: BorderRadius.circular(14),
                     ),
-                    child: const Icon(Icons.pin_drop_outlined),
+                    child: const Icon(Icons.pin_drop_outlined, color: Color(0xFFEF7F1A)),
                   ),
                 ],
               ),
@@ -2052,7 +2090,7 @@ class _NearbyTabState extends State<NearbyTab> {
             Row(
               children: [
                 Text(
-                  "Latest Reports",
+                  "실시간 피드",
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
                 ),
                 const Spacer(),
@@ -2227,32 +2265,40 @@ class _SegmentRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 10, 14, 8),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.35)),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(4),
-          child: SegmentedButton<PostType?>(
-            showSelectedIcon: false,
-            style: ButtonStyle(
-              textStyle: WidgetStateProperty.all(
-                Theme.of(context).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
-              ),
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.2)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(4),
+        child: SegmentedButton<PostType?>(
+          showSelectedIcon: false,
+          style: ButtonStyle(
+            backgroundColor: WidgetStateProperty.resolveWith((states) {
+              final selected = states.contains(WidgetState.selected);
+              return selected ? const Color(0xFFFFE8CF) : Colors.transparent;
+            }),
+            foregroundColor: WidgetStateProperty.resolveWith((states) {
+              final selected = states.contains(WidgetState.selected);
+              return selected ? const Color(0xFFB95B00) : const Color(0xFF5D6470);
+            }),
+            textStyle: WidgetStateProperty.all(
+              Theme.of(context).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
             ),
-            segments: const [
-              ButtonSegment(value: null, label: Text("전체")),
-              ButtonSegment(value: PostType.lost, label: Text("실종")),
-              ButtonSegment(value: PostType.sighting, label: Text("목격")),
-              ButtonSegment(value: PostType.shelter, label: Text("보호")),
-            ],
-            selected: {filterType},
-            onSelectionChanged: (s) => onChanged(s.first),
+            shape: WidgetStateProperty.all(
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
           ),
+          segments: const [
+            ButtonSegment(value: null, label: Text("전체")),
+            ButtonSegment(value: PostType.lost, label: Text("실종")),
+            ButtonSegment(value: PostType.sighting, label: Text("목격")),
+            ButtonSegment(value: PostType.shelter, label: Text("보호")),
+          ],
+          selected: {filterType},
+          onSelectionChanged: (s) => onChanged(s.first),
         ),
       ),
     );
@@ -2305,14 +2351,47 @@ class _TopFilterChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ActionChip(
-      onPressed: onTap,
-      avatar: icon == null ? null : Icon(icon, size: 16),
-      label: Text(label),
-      shape: StadiumBorder(
-        side: BorderSide(color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.3)),
+    Color bg;
+    Color fg;
+    if (label.contains("최근")) {
+      bg = const Color(0xFFFFE8CE);
+      fg = const Color(0xFF9A4E00);
+    } else if (label.contains("등록일") || label.contains("거리")) {
+      bg = const Color(0xFFE8EDFF);
+      fg = const Color(0xFF2F4DBA);
+    } else if (label.contains("지역")) {
+      bg = const Color(0xFFE8F5E9);
+      fg = const Color(0xFF2E7D32);
+    } else {
+      bg = const Color(0xFFFFF3E0);
+      fg = const Color(0xFF8A5A1F);
+    }
+    return InkWell(
+      borderRadius: BorderRadius.circular(999),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.22)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (icon != null) ...[
+              Icon(icon, size: 16, color: fg),
+              const SizedBox(width: 5),
+            ],
+            Text(
+              label,
+              style: TextStyle(color: fg, fontWeight: FontWeight.w700, fontSize: 13),
+            ),
+            const SizedBox(width: 3),
+            Icon(Icons.keyboard_arrow_down_rounded, size: 17, color: fg),
+          ],
+        ),
       ),
-      backgroundColor: const Color(0xFFFFFEFC),
     );
   }
 }
@@ -2351,15 +2430,22 @@ class _PostCard extends StatelessWidget {
         );
       },
       child: InkWell(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(24),
         onTap: () => Navigator.of(context).push(
           MaterialPageRoute(builder: (_) => PostDetailPage(postId: post.id)),
         ),
         child: Container(
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            color: const Color(0xFFFFFEFC),
-            border: Border.all(color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.24)),
+            borderRadius: BorderRadius.circular(24),
+            color: Colors.white,
+            border: Border.all(color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.16)),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x14000000),
+                blurRadius: 20,
+                offset: Offset(0, 10),
+              ),
+            ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -2367,17 +2453,31 @@ class _PostCard extends StatelessWidget {
               Stack(
                 children: [
                   Container(
-                    height: 186,
+                    height: 198,
                     decoration: BoxDecoration(
-                      borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
                       color: Theme.of(context).colorScheme.surfaceContainerHigh,
                     ),
                     clipBehavior: Clip.antiAlias,
                     child: post.photoBase64 != null && post.photoBase64!.isNotEmpty
-                        ? Image.memory(
-                            base64Decode(post.photoBase64!),
-                            fit: BoxFit.cover,
-                            width: double.infinity,
+                        ? Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              Image.memory(
+                                base64Decode(post.photoBase64!),
+                                fit: BoxFit.cover,
+                                width: double.infinity,
+                              ),
+                              const DecoratedBox(
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topCenter,
+                                    end: Alignment.bottomCenter,
+                                    colors: [Color(0x00000000), Color(0x64000000)],
+                                  ),
+                                ),
+                              ),
+                            ],
                           )
                         : Center(
                             child: Icon(_postTypeIcon(post.type), size: 42),
@@ -2419,13 +2519,13 @@ class _PostCard extends StatelessWidget {
                 ],
               ),
               Padding(
-                padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+                padding: const EdgeInsets.fromLTRB(14, 13, 14, 14),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       post.title,
-                      style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800, height: 1.22),
+                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, height: 1.2),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
