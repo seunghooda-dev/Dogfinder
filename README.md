@@ -66,45 +66,102 @@ flutter pub get
 flutter analyze
 ```
 
-## Run helpers (no cross-terminal interference)
+## 🚀 실행 스크립트 (웹/안드로이드/iOS)
 
-현재 기본 동작은 자동으로 기존 프로세스를 종료하지 않으며, 필요할 때만 `-KillExisting`으로 현재 프로젝트 범위에서만 정리한 뒤 실행합니다.
+이 프로젝트는 Flutter 실행 시 기존 프로세스 충돌을 줄이기 위해 스크립트를 제공합니다.
 
-`run-web.ps1`
+⚠️ iOS 주의
+`run-ios.ps1`는 **macOS + Xcode** 환경에서만 동작합니다. Windows에서는 iOS 실행이 불가능합니다.
+
+- Windows에서 즉시 사용 가능: `run-web.ps1`, `run-android.ps1`
+- macOS에서 iOS 포함 사용 가능: `run-ios.ps1`
+
+### 1) 기본 실행
+
+- 웹: `.\run-web.ps1`
+- 안드로이드: `.\run-android.ps1`
+- iOS: `.\run-ios.ps1`
+
+### 2) 실전용 템플릿
+
+웹 예시
+
 ```bash
-.\run-web.ps1
-.\run-web.ps1 -DartDefine @("BACKEND_BASE_URL=http://localhost:3000","KAKAO_NATIVE_APP_KEY=YOUR_KAKAO_NATIVE_APP_KEY")
-.\run-web.ps1 -DartDefineString "BACKEND_BASE_URL=http://localhost:3000;KAKAO_NATIVE_APP_KEY=YOUR_KAKAO_NATIVE_APP_KEY"
+.\run-web.ps1 -DartDefineString "BACKEND_BASE_URL=http://localhost:3000;KAKAO_NATIVE_APP_KEY=YOUR_KAKAO_NATIVE_APP_KEY;NAVER_CLIENT_ID=YOUR_NAVER_CLIENT_ID;NAVER_CLIENT_SECRET=YOUR_NAVER_CLIENT_SECRET;NAVER_CLIENT_NAME=YOUR_NAVER_CLIENT_NAME;FIREBASE_API_KEY=YOUR_FIREBASE_API_KEY;FIREBASE_PROJECT_ID=YOUR_FIREBASE_PROJECT_ID;FIREBASE_MESSAGING_SENDER_ID=YOUR_FIREBASE_MESSAGING_SENDER_ID;FIREBASE_ANDROID_APP_ID=YOUR_FIREBASE_ANDROID_APP_ID;FIREBASE_IOS_APP_ID=YOUR_FIREBASE_IOS_APP_ID;FIREBASE_IOS_BUNDLE_ID=YOUR_FIREBASE_IOS_BUNDLE_ID;FIREBASE_STORAGE_BUCKET=YOUR_FIREBASE_STORAGE_BUCKET"
 ```
 
-`run-android.ps1`
+안드로이드 예시
+
 ```bash
-.\run-android.ps1
-.\run-android.ps1 -DartDefine @("BACKEND_BASE_URL=http://localhost:3000")
-.\run-android.ps1 -DartDefineString "BACKEND_BASE_URL=http://localhost:3000;KAKAO_NATIVE_APP_KEY=YOUR_KAKAO_NATIVE_APP_KEY"
+.\run-android.ps1 -DartDefine @(
+  "BACKEND_BASE_URL=http://localhost:3000",
+  "KAKAO_NATIVE_APP_KEY=YOUR_KAKAO_NATIVE_APP_KEY",
+  "NAVER_CLIENT_ID=YOUR_NAVER_CLIENT_ID",
+  "NAVER_CLIENT_SECRET=YOUR_NAVER_CLIENT_SECRET",
+  "NAVER_CLIENT_NAME=YOUR_NAVER_CLIENT_NAME",
+  "FIREBASE_API_KEY=YOUR_FIREBASE_API_KEY",
+  "FIREBASE_PROJECT_ID=YOUR_FIREBASE_PROJECT_ID",
+  "FIREBASE_MESSAGING_SENDER_ID=YOUR_FIREBASE_MESSAGING_SENDER_ID",
+  "FIREBASE_ANDROID_APP_ID=YOUR_FIREBASE_ANDROID_APP_ID",
+  "FIREBASE_STORAGE_BUCKET=YOUR_FIREBASE_STORAGE_BUCKET"
+)
 ```
 
-`run-ios.ps1`
+iOS 예시 (macOS에서만)
+
 ```bash
-.\run-ios.ps1
-.\run-ios.ps1 -DartDefine @("BACKEND_BASE_URL=http://localhost:3000")
-.\run-ios.ps1 -DartDefineString "BACKEND_BASE_URL=http://localhost:3000;KAKAO_NATIVE_APP_KEY=YOUR_KAKAO_NATIVE_APP_KEY"
+.\run-ios.ps1 -DartDefine @(
+  "BACKEND_BASE_URL=http://localhost:3000",
+  "KAKAO_NATIVE_APP_KEY=YOUR_KAKAO_NATIVE_APP_KEY",
+  "NAVER_CLIENT_ID=YOUR_NAVER_CLIENT_ID",
+  "NAVER_CLIENT_SECRET=YOUR_NAVER_CLIENT_SECRET",
+  "NAVER_CLIENT_NAME=YOUR_NAVER_CLIENT_NAME",
+  "NAVER_URL_SCHEME=YOUR_NAVER_URL_SCHEME",
+  "FIREBASE_API_KEY=YOUR_FIREBASE_API_KEY",
+  "FIREBASE_PROJECT_ID=YOUR_FIREBASE_PROJECT_ID",
+  "FIREBASE_MESSAGING_SENDER_ID=YOUR_FIREBASE_MESSAGING_SENDER_ID",
+  "FIREBASE_IOS_APP_ID=YOUR_FIREBASE_IOS_APP_ID",
+  "FIREBASE_IOS_BUNDLE_ID=YOUR_FIREBASE_IOS_BUNDLE_ID",
+  "FIREBASE_STORAGE_BUCKET=YOUR_FIREBASE_STORAGE_BUCKET"
+)
 ```
 
-실행 옵션
-- `-Release`: 안드로이드/iOS를 release 모드로 실행
-- `-KillExisting`: 현재 프로젝트 경로(dogfinder)와 관련된 dart/flutter 프로세스만 종료
-- `-DartDefine`: `--dart-define` 값 목록을 전달
-- `-DartDefineString`: `;` 또는 `,`로 구분한 문자열로 다중 define 전달 (cmd에서 사용)
-- 기본 동작은 기존 프로세스 자동 종료 없음
+### 3) release 모드
 
-`run-web.bat`, `run-android.bat`, `run-ios.bat`는 PowerShell 스크립트 래퍼입니다.
+- 안드로이드
 
-예시
 ```bash
-.\run-web.bat
+.\run-android.ps1 -Release
+```
+
+- iOS (macOS)
+
+```bash
+.\run-ios.ps1 -Release
+```
+
+### 4) 기존 프로세스 정리
+
+- 기본값: 기존 프로세스를 자동 종료하지 않음(안전 모드)
+- 필요할 때만 현재 프로젝트 관련 프로세스 정리:
+
+```bash
+.\run-web.ps1 -KillExisting
+```
+
+### 5) 배치 래퍼 사용
+
+- `run-web.bat`, `run-android.bat`, `run-ios.bat`는 PowerShell 스크립트 래퍼입니다.
+
+```bash
 .\run-android.bat -DartDefine "BACKEND_BASE_URL=http://localhost:3000"
 ```
+
+### 6) 문제 해결(자주 묻는 질문)
+
+- `Target of URI doesn't exist` 오류: import 경로 오류 가능성이 크므로 `run` 스크립트가 참조하는 파일 경로가 최신인지 확인
+- 이전 실행이 살아 있는 것처럼 보임: `-KillExisting`로 현재 프로젝트 관련 프로세스만 정리 후 재실행
+- 여러 터미널 동시 실행: 권장되지 않음. 새 실행 전 한 터미널에서만 실행
 ## Firebase push setup (required for real push)
 
 Run with Firebase options:
