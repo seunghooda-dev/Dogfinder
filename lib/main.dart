@@ -2,6 +2,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
+import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
@@ -19,7 +20,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'backend/api_contract.dart';
 import 'backend/backend_api_factory.dart';
 import 'backend/rest_backend_api.dart';
-import 'push/push_service.dart';
+import "package:dogfinder/push_service.dart";
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -685,11 +686,16 @@ class AppStore extends ChangeNotifier {
         final email = entry.key.toString();
         final value = entry.value;
         if (value is! Map) continue;
-        final password = (value["password"] ?? "").toString();
+        var passwordHash = (value["passwordHash"] ?? "").toString();
+        if (passwordHash.isEmpty) {
+          final legacyPassword = (value["password"] ?? "").toString();
+          if (legacyPassword.isEmpty) continue;
+          passwordHash = _hashPassword(legacyPassword);
+        }
         final name = (value["name"] ?? "").toString();
-        if (password.isEmpty) continue;
+        if (passwordHash.isEmpty) continue;
         _emailUsers[email] = {
-          "password": password,
+          "passwordHash": passwordHash,
           "name": name,
         };
       }
@@ -905,9 +911,7 @@ class AppStore extends ChangeNotifier {
 
   Future<void> _registerRealtimeSession() async {
     if (backendApi == null) return;
-    try {
-      await registerPushToken("inapp_$deviceId");
-    } catch (_) {}
+    return;
   }
 
   Future<void> _pollRealtimeChanges() async {
@@ -1287,6 +1291,55 @@ class AppStore extends ChangeNotifier {
     return _signInWithEmailLocal(email: normalizedEmail, password: password);
   }
 
+  Future<String?> signInWithSocial({
+    required String provider,
+    required String displayName,
+    String? providerUserId,
+    String? email,
+    String? accessToken,
+  }) async {
+    final normalizedProvider = provider.trim().toLowerCase();
+    final resolvedDisplayName = displayName.trim().isNotEmpty
+        ? displayName.trim()
+        : normalizedProvider == "kakao"
+            ? "카카오 사용자"
+            : normalizedProvider == "naver"
+                ? "네이버 사용자"
+                : "소셜 사용자";
+
+    if (normalizedProvider.isEmpty) {
+      return "지원하지 않는 소셜 로그인입니다.";
+    }
+
+    if (backendApi != null) {
+      try {
+        final session = await backendApi!.signInWithSocial(
+          provider: normalizedProvider,
+          displayName: resolvedDisplayName,
+          providerUserId: providerUserId,
+          email: email,
+          accessToken: accessToken,
+        );
+        authUserId = session.userId.trim().isNotEmpty ? session.userId.trim() : null;
+        await signIn(
+          normalizedProvider,
+          displayName: session.displayName ?? session.email ?? resolvedDisplayName,
+        );
+        return null;
+      } on BackendException catch (e) {
+        if (e.statusCode >= 400 && e.statusCode < 500) {
+          return e.message;
+        }
+      } catch (_) {}
+    }
+
+    await signIn(
+      normalizedProvider,
+      displayName: resolvedDisplayName,
+    );
+    return null;
+  }
+
   Future<void> signOut() async {
     authProvider = null;
     authName = null;
@@ -1519,7 +1572,7 @@ class AppStore extends ChangeNotifier {
     if (info == null) {
       return "가입된 이메일이 없어요.";
     }
-    if ((info["password"] ?? "") != password) {
+    if ((info["passwordHash"] ?? "") != _hashPassword(password)) {
       return "비밀번호가 일치하지 않아요.";
     }
     final name = (info["name"] ?? "").trim();
@@ -1531,13 +1584,17 @@ class AppStore extends ChangeNotifier {
     return null;
   }
 
+  String _hashPassword(String password) {
+    return sha256.convert(utf8.encode(password)).toString();
+  }
+
   Future<void> _upsertLocalEmailUser({
     required String email,
     required String password,
     String? displayName,
   }) async {
     _emailUsers[email] = {
-      "password": password,
+      "passwordHash": _hashPassword(password),
       "name": (displayName ?? "").trim(),
     };
     await _saveEmailUsers();
@@ -1611,6 +1668,228 @@ extension StoreX on BuildContext {
   AppStore readStore() => StoreScope.read(this);
 }
 
+class DogFinderTheme {
+  static const primary = Color(0xFF7EC8B8);
+  static const primaryLight = Color(0xFFB2DFDB);
+  static const primaryDark = Color(0xFF4DA896);
+  static const secondary = Color(0xFFA8D5E2);
+  static const accent = Color(0xFFFFD6A5);
+  static const background = Color(0xFFF2FAFA);
+  static const surface = Color(0xFFFFFFFF);
+  static const textPrimary = Color(0xFF2D2D2D);
+  static const textSecondary = Color(0xFF6B6B6B);
+  static const textLight = Color(0xFF9E9E9E);
+  static const shadowLight = Color(0x14000000);
+  static const shadowMedium = Color(0x0C000000);
+  static const shadowMid = Color(0x10000000);
+  static const shadowCard = Color(0x10000000);
+  static const divider = Color(0xFFE9ECF1);
+
+  // 상태/필터 칩
+  static const segmentSelectedBg = Color(0xFFFFE8CF);
+  static const segmentSelectedFg = Color(0xFFB95B00);
+  static const segmentUnselectedFg = Color(0xFF5D6470);
+  static const filterRecentBg = Color(0xFFFFE8CE);
+  static const filterRecentFg = Color(0xFF9A4E00);
+  static const filterDateBg = Color(0xFFE8EDFF);
+  static const filterDateFg = Color(0xFF2F4DBA);
+  static const filterAreaBg = Color(0xFFE8F5E9);
+  static const filterAreaFg = Color(0xFF2E7D32);
+  static const filterDefaultBg = Color(0xFFFFF3E0);
+  static const filterDefaultFg = Color(0xFF8A5A1F);
+
+  // 상태 배지
+  static const badgeMissingBg = Color(0xFFFFE7E6);
+  static const badgeMissingFg = Color(0xFFC62828);
+  static const badgeSightingBg = Color(0xFFE6EEFF);
+  static const badgeSightingFg = Color(0xFF2F55D4);
+  static const badgeShelterBg = Color(0xFFE7F6EB);
+  static const badgeShelterFg = Color(0xFF2E7D32);
+  static const badgeActiveBg = Color(0xFFFFF1DB);
+  static const badgeActiveFg = Color(0xFFB56A00);
+
+  // 외부 로그인 버튼 톤
+  static const socialKakao = Color(0xFFFEE500);
+  static const socialNaver = Color(0xFF03C75A);
+  static const socialKakaoText = Color(0xFF111111);
+
+  // 지도/강조 요소
+  static const mapPin = primary;
+
+  static ThemeData get lightTheme {
+    final baseTheme = ThemeData(
+      useMaterial3: true,
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: primary,
+        primary: primary,
+        secondary: secondary,
+        surface: surface,
+        brightness: Brightness.light,
+      ),
+    );
+    final textTheme = GoogleFonts.notoSansKrTextTheme(baseTheme.textTheme);
+
+    return baseTheme.copyWith(
+      scaffoldBackgroundColor: background,
+      textTheme: textTheme.copyWith(
+        headlineLarge: GoogleFonts.notoSansKr(
+          fontSize: 32,
+          fontWeight: FontWeight.w700,
+          color: textPrimary,
+        ),
+        headlineMedium: GoogleFonts.notoSansKr(
+          fontSize: 24,
+          fontWeight: FontWeight.w600,
+          color: textPrimary,
+        ),
+        titleLarge: GoogleFonts.notoSansKr(
+          fontSize: 20,
+          fontWeight: FontWeight.w600,
+          color: textPrimary,
+        ),
+        bodyLarge: GoogleFonts.notoSansKr(
+          fontSize: 16,
+          color: textPrimary,
+        ),
+        bodyMedium: GoogleFonts.notoSansKr(
+          fontSize: 14,
+          color: textSecondary,
+        ),
+        labelLarge: GoogleFonts.notoSansKr(
+          fontSize: 16,
+          fontWeight: FontWeight.w600,
+          color: textPrimary,
+        ),
+      ),
+      appBarTheme: AppBarTheme(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        centerTitle: true,
+        scrolledUnderElevation: 0,
+        surfaceTintColor: Colors.transparent,
+        titleTextStyle: GoogleFonts.notoSansKr(
+          fontSize: 20,
+          fontWeight: FontWeight.w700,
+          color: textPrimary,
+        ),
+        iconTheme: const IconThemeData(color: textPrimary),
+      ),
+      listTileTheme: ListTileThemeData(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        dense: true,
+        iconColor: textSecondary,
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: surface,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      ),
+      segmentedButtonTheme: SegmentedButtonThemeData(
+        style: ButtonStyle(
+          textStyle: WidgetStateProperty.all(
+            GoogleFonts.notoSansKr(fontSize: 13.5, fontWeight: FontWeight.w600),
+          ),
+          shape: WidgetStateProperty.all(
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          ),
+        ),
+      ),
+      bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+        selectedItemColor: primary,
+        unselectedItemColor: textLight,
+      ),
+      navigationBarTheme: NavigationBarThemeData(
+        height: 70,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        indicatorColor: primaryLight.withValues(alpha: 0.35),
+        iconTheme: WidgetStateProperty.resolveWith(
+          (states) => IconThemeData(
+            color: states.contains(WidgetState.selected) ? primary : textLight,
+            size: states.contains(WidgetState.selected) ? 22 : 21,
+          ),
+        ),
+        labelTextStyle: WidgetStateProperty.resolveWith(
+          (states) => GoogleFonts.notoSansKr(
+            fontSize: 12,
+            color: states.contains(WidgetState.selected) ? primary : textLight,
+            fontWeight:
+                states.contains(WidgetState.selected) ? FontWeight.w700 : FontWeight.w500,
+          ),
+        ),
+      ),
+      cardTheme: CardThemeData(
+        color: surface,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: BorderSide(color: Colors.grey.shade200.withValues(alpha: 0.5)),
+        ),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: Colors.white,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(color: Colors.grey.shade200),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(color: Colors.grey.shade200),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: primary, width: 2),
+        ),
+      ),
+      chipTheme: baseTheme.chipTheme.copyWith(
+        side: BorderSide(color: Colors.grey.shade300.withValues(alpha: 0.6)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          backgroundColor: primary,
+          foregroundColor: Colors.white,
+          textStyle: GoogleFonts.notoSansKr(
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: primary,
+          side: const BorderSide(color: primary),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+          textStyle: GoogleFonts.notoSansKr(
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+      dividerColor: divider,
+      floatingActionButtonTheme: const FloatingActionButtonThemeData(
+        shape: StadiumBorder(),
+        backgroundColor: primary,
+        foregroundColor: Colors.white,
+      ),
+      snackBarTheme: const SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        insetPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      ),
+      bottomSheetTheme: const BottomSheetThemeData(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+      ),
+    );
+  }
+}
+
 /// --------------------------------------------
 /// App Root
 /// --------------------------------------------
@@ -1620,118 +1899,11 @@ class DogFinderApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const seed = Color(0xFF0F766E);
-    const accent = Color(0xFFFF6A3D);
-    final baseTheme = ThemeData(
-      useMaterial3: true,
-      colorScheme: ColorScheme.fromSeed(
-        seedColor: seed,
-        brightness: Brightness.light,
-      ),
-    );
-    final textTheme = GoogleFonts.notoSansKrTextTheme(baseTheme.textTheme).copyWith(
-      headlineSmall: GoogleFonts.notoSansKr(fontWeight: FontWeight.w800, letterSpacing: -0.35),
-      titleLarge: GoogleFonts.notoSansKr(fontWeight: FontWeight.w800, letterSpacing: -0.25),
-      titleMedium: GoogleFonts.notoSansKr(fontWeight: FontWeight.w700, letterSpacing: -0.12),
-      titleSmall: GoogleFonts.notoSansKr(fontWeight: FontWeight.w700, letterSpacing: -0.08),
-      labelLarge: GoogleFonts.notoSansKr(fontWeight: FontWeight.w700, letterSpacing: -0.02),
-    );
     return StoreScope(
       store: store,
       child: MaterialApp(
         title: "Dog Finder MVP",
-        theme: baseTheme.copyWith(
-          scaffoldBackgroundColor: const Color(0xFFF4F7FB),
-          textTheme: textTheme,
-          primaryTextTheme: GoogleFonts.notoSansKrTextTheme(baseTheme.primaryTextTheme),
-          appBarTheme: AppBarTheme(
-            centerTitle: false,
-            elevation: 0,
-            scrolledUnderElevation: 0,
-            backgroundColor: Colors.transparent,
-            surfaceTintColor: Colors.transparent,
-            foregroundColor: const Color(0xFF111827),
-            titleTextStyle: GoogleFonts.notoSansKr(
-              fontSize: 21,
-              fontWeight: FontWeight.w800,
-              color: const Color(0xFF111827),
-              letterSpacing: -0.24,
-            ),
-          ),
-          navigationBarTheme: NavigationBarThemeData(
-            height: 72,
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-            indicatorColor: const Color(0xFFD9F4EE),
-            iconTheme: WidgetStateProperty.resolveWith((states) {
-              final selected = states.contains(WidgetState.selected);
-              return IconThemeData(
-                color: selected ? const Color(0xFF0F766E) : const Color(0xFF7D8491),
-                size: selected ? 23 : 22,
-              );
-            }),
-            labelTextStyle: WidgetStateProperty.resolveWith((states) {
-              final selected = states.contains(WidgetState.selected);
-              return GoogleFonts.notoSansKr(
-                fontSize: 12,
-                color: selected ? const Color(0xFF0F766E) : const Color(0xFF7D8491),
-                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-              );
-            }),
-          ),
-          cardTheme: CardThemeData(
-            color: Colors.white,
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-              side: BorderSide(color: baseTheme.colorScheme.outline.withValues(alpha: 0.14)),
-            ),
-          ),
-          inputDecorationTheme: InputDecorationTheme(
-            filled: true,
-            fillColor: Colors.white,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: BorderSide(color: baseTheme.colorScheme.outline.withValues(alpha: 0.2)),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: BorderSide(color: baseTheme.colorScheme.outline.withValues(alpha: 0.2)),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: BorderSide(color: accent, width: 1.5),
-            ),
-          ),
-          chipTheme: baseTheme.chipTheme.copyWith(
-            side: BorderSide(color: baseTheme.colorScheme.outline.withValues(alpha: 0.2)),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-          filledButtonTheme: FilledButtonThemeData(
-            style: FilledButton.styleFrom(
-              backgroundColor: accent,
-              foregroundColor: Colors.white,
-              textStyle: GoogleFonts.notoSansKr(fontWeight: FontWeight.w700),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-            ),
-          ),
-          outlinedButtonTheme: OutlinedButtonThemeData(
-            style: OutlinedButton.styleFrom(
-              textStyle: GoogleFonts.notoSansKr(fontWeight: FontWeight.w700),
-              side: BorderSide(color: baseTheme.colorScheme.outline.withValues(alpha: 0.3)),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            ),
-          ),
-          dividerColor: const Color(0xFFE9ECF1),
-          floatingActionButtonTheme: const FloatingActionButtonThemeData(
-            shape: StadiumBorder(),
-            backgroundColor: Color(0xFF0F766E),
-            foregroundColor: Colors.white,
-          ),
-        ),
+        theme: DogFinderTheme.lightTheme,
         home: const Shell(),
       ),
     );
@@ -1781,25 +1953,32 @@ class _ShellState extends State<Shell> {
       ),
       bottomNavigationBar: SafeArea(
         minimum: const EdgeInsets.fromLTRB(12, 0, 12, 10),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.95),
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.14)),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x12000000),
-                blurRadius: 22,
-                offset: Offset(0, 10),
-              ),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              DogFinderTheme.surface,
+              DogFinderTheme.background,
             ],
           ),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: DogFinderTheme.primary.withValues(alpha: 0.22)),
+          boxShadow: [
+            BoxShadow(
+              color: DogFinderTheme.shadowCard,
+              blurRadius: 16,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(22),
+            borderRadius: BorderRadius.circular(16),
             child: NavigationBar(
               selectedIndex: index,
               onDestinationSelected: (i) => setState(() => index = i),
-              indicatorShape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              indicatorShape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               destinations: const [
                 NavigationDestination(
                   icon: Icon(Icons.place_outlined),
@@ -1837,14 +2016,13 @@ class _AppLayeredBackground extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DecoratedBox(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Color(0xFFF4FBFA),
-            Color(0xFFF5F8FF),
-            Color(0xFFFFF7F1),
+            DogFinderTheme.background,
+            DogFinderTheme.background.withValues(alpha: 0.98),
           ],
         ),
       ),
@@ -1925,10 +2103,11 @@ class _NearbyTabState extends State<NearbyTab> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              "PAWINHAND",
+              "Dogfinder",
               style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: const Color(0xFFEF7F1A),
-                    letterSpacing: 0.2,
+                    color: DogFinderTheme.primary,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.1,
                   ),
             ),
             Text(
@@ -2033,15 +2212,19 @@ class _NearbyTabState extends State<NearbyTab> {
               padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(24),
-                gradient: const LinearGradient(
-                  colors: [Color(0xFFFFF1DF), Color(0xFFFFF8F0), Color(0xFFE7F1FF)],
+                gradient: LinearGradient(
+                  colors: [
+                    DogFinderTheme.accent.withValues(alpha: 0.28),
+                    DogFinderTheme.primaryLight.withValues(alpha: 0.24),
+                    DogFinderTheme.secondary.withValues(alpha: 0.35),
+                  ],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
                 border: Border.all(color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.16)),
                 boxShadow: const [
                   BoxShadow(
-                    color: Color(0x12000000),
+                    color: DogFinderTheme.shadowMedium,
                     blurRadius: 18,
                     offset: Offset(0, 8),
                   ),
@@ -2084,7 +2267,7 @@ class _NearbyTabState extends State<NearbyTab> {
                       color: Colors.white.withValues(alpha: 0.85),
                       borderRadius: BorderRadius.circular(14),
                     ),
-                    child: const Icon(Icons.pin_drop_outlined, color: Color(0xFFEF7F1A)),
+                    child: const Icon(Icons.pin_drop_outlined, color: DogFinderTheme.primary),
                   ),
                 ],
               ),
@@ -2252,17 +2435,20 @@ class _NearbyFilterSheetState extends State<_NearbyFilterSheet> {
         ),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.4)),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text("필터", style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+            Text(
+              "필터",
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+            ),
             const SizedBox(height: 12),
             Row(
               children: [
-                const Text("반경"),
+                Text("반경", style: Theme.of(context).textTheme.labelLarge),
                 Expanded(
                   child: Slider(
                     value: radiusKm,
@@ -2279,12 +2465,12 @@ class _NearbyFilterSheetState extends State<_NearbyFilterSheet> {
             SwitchListTile(
               value: onlyActive,
               onChanged: (v) => setState(() => onlyActive = v),
-              title: const Text("진행중만 보기"),
+                title: const Text("진행중만 보기"),
             ),
             SwitchListTile(
               value: sortByDistance,
               onChanged: (v) => setState(() => sortByDistance = v),
-              title: const Text("가까운순 정렬"),
+                title: const Text("가까운순 정렬"),
             ),
             const SizedBox(height: 8),
             Row(
@@ -2348,11 +2534,11 @@ class _SegmentRow extends StatelessWidget {
           style: ButtonStyle(
             backgroundColor: WidgetStateProperty.resolveWith((states) {
               final selected = states.contains(WidgetState.selected);
-              return selected ? const Color(0xFFFFE8CF) : Colors.transparent;
+              return selected ? DogFinderTheme.segmentSelectedBg : Colors.transparent;
             }),
             foregroundColor: WidgetStateProperty.resolveWith((states) {
               final selected = states.contains(WidgetState.selected);
-              return selected ? const Color(0xFFB95B00) : const Color(0xFF5D6470);
+              return selected ? DogFinderTheme.segmentSelectedFg : DogFinderTheme.segmentUnselectedFg;
             }),
             textStyle: WidgetStateProperty.all(
               Theme.of(context).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
@@ -2424,17 +2610,17 @@ class _TopFilterChip extends StatelessWidget {
     Color bg;
     Color fg;
     if (label.contains("최근")) {
-      bg = const Color(0xFFFFE8CE);
-      fg = const Color(0xFF9A4E00);
+      bg = DogFinderTheme.filterRecentBg;
+      fg = DogFinderTheme.filterRecentFg;
     } else if (label.contains("등록일") || label.contains("거리")) {
-      bg = const Color(0xFFE8EDFF);
-      fg = const Color(0xFF2F4DBA);
+      bg = DogFinderTheme.filterDateBg;
+      fg = DogFinderTheme.filterDateFg;
     } else if (label.contains("지역")) {
-      bg = const Color(0xFFE8F5E9);
-      fg = const Color(0xFF2E7D32);
+      bg = DogFinderTheme.filterAreaBg;
+      fg = DogFinderTheme.filterAreaFg;
     } else {
-      bg = const Color(0xFFFFF3E0);
-      fg = const Color(0xFF8A5A1F);
+      bg = DogFinderTheme.filterDefaultBg;
+      fg = DogFinderTheme.filterDefaultFg;
     }
     return InkWell(
       borderRadius: BorderRadius.circular(999),
@@ -2455,7 +2641,11 @@ class _TopFilterChip extends StatelessWidget {
             ],
             Text(
               label,
-              style: TextStyle(color: fg, fontWeight: FontWeight.w700, fontSize: 13),
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: fg,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                  ),
             ),
             const SizedBox(width: 3),
             Icon(Icons.keyboard_arrow_down_rounded, size: 17, color: fg),
@@ -2504,19 +2694,19 @@ class _PostCard extends StatelessWidget {
         onTap: () => Navigator.of(context).push(
           MaterialPageRoute(builder: (_) => PostDetailPage(postId: post.id)),
         ),
-        child: Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(24),
-            color: Colors.white,
-            border: Border.all(color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.16)),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x14000000),
-                blurRadius: 20,
-                offset: Offset(0, 10),
-              ),
-            ],
-          ),
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(24),
+              color: Colors.white,
+              border: Border.all(color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.16)),
+              boxShadow: const [
+                BoxShadow(
+                  color: DogFinderTheme.shadowLight,
+                  blurRadius: 20,
+                  offset: Offset(0, 10),
+                ),
+              ],
+            ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -2595,7 +2785,10 @@ class _PostCard extends StatelessWidget {
                   children: [
                     Text(
                       post.title,
-                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, height: 1.2),
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w800,
+                            height: 1.2,
+                          ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -2638,24 +2831,24 @@ class _Badge extends StatelessWidget {
     final isShelter = text == "보호";
     final isActive = text == "진행중";
     final bgColor = isMissing
-        ? const Color(0xFFFFE7E6)
+        ? DogFinderTheme.badgeMissingBg
         : isSighting
-            ? const Color(0xFFE6EEFF)
+            ? DogFinderTheme.badgeSightingBg
             : isShelter
-                ? const Color(0xFFE7F6EB)
+                ? DogFinderTheme.badgeShelterBg
                 : isActive
-                    ? const Color(0xFFFFF1DB)
+                    ? DogFinderTheme.badgeActiveBg
                     : outlined
                         ? cs.surface
                         : cs.surfaceContainerHigh;
     final fgColor = isMissing
-        ? const Color(0xFFC62828)
+        ? DogFinderTheme.badgeMissingFg
         : isSighting
-            ? const Color(0xFF2F55D4)
+            ? DogFinderTheme.badgeSightingFg
             : isShelter
-                ? const Color(0xFF2E7D32)
+                ? DogFinderTheme.badgeShelterFg
                 : isActive
-                    ? const Color(0xFFB56A00)
+                    ? DogFinderTheme.badgeActiveFg
                     : cs.onSurface;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -2666,11 +2859,11 @@ class _Badge extends StatelessWidget {
       ),
       child: Text(
         text,
-        style: TextStyle(
-          fontSize: 11.5,
-          fontWeight: FontWeight.w700,
-          color: fgColor,
-        ),
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w700,
+              color: fgColor,
+            ),
       ),
     );
   }
@@ -2692,11 +2885,10 @@ class _ChipTag extends StatelessWidget {
       ),
       child: Text(
         text,
-        style: TextStyle(
-          fontSize: 12,
-          color: cs.onSurfaceVariant,
-          fontWeight: FontWeight.w500,
-        ),
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: cs.onSurfaceVariant,
+              fontWeight: FontWeight.w500,
+            ),
       ),
     );
   }
@@ -2783,7 +2975,10 @@ class PostDetailPage extends StatelessWidget {
           _CTASection(post: post),
           const SizedBox(height: 20),
           if (post.type == PostType.lost) ...[
-            Text("제보 (${tips.length})", style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+            Text(
+              "제보 (${tips.length})",
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+            ),
             const SizedBox(height: 8),
             if (tips.isEmpty)
               Card(
@@ -2801,7 +2996,7 @@ class PostDetailPage extends StatelessWidget {
               ...tips.map((t) => _TipTile(tip: t)),
             const SizedBox(height: 16),
           ],
-          Text("비슷한 제보", style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+          Text("비슷한 제보", style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800)),
           const SizedBox(height: 8),
           ...store.posts
               .where((p) => p.id != post.id && p.status == PostStatus.active)
@@ -2979,7 +3174,7 @@ class _DetailHero extends StatelessWidget {
     return Container(
       height: 198,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
         color: Theme.of(context).colorScheme.surfaceContainerHigh,
       ),
       clipBehavior: Clip.antiAlias,
@@ -3011,7 +3206,10 @@ class _DetailHero extends StatelessWidget {
               ),
               child: Text(
                 _postTypeLabel(post.type),
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                    ),
               ),
             ),
           ),
@@ -3313,8 +3511,8 @@ class RegisterTab extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(16),
-              gradient: const LinearGradient(
-                colors: [Color(0xFFEAF7F4), Color(0xFFF1F8FE)],
+              gradient: LinearGradient(
+            colors: [DogFinderTheme.primary.withValues(alpha: 0.14), DogFinderTheme.surface],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -3394,26 +3592,22 @@ class _RegisterActionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.white.withValues(alpha: 0.9),
-      borderRadius: BorderRadius.circular(18),
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(14),
       child: InkWell(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(14),
         onTap: onTap,
         child: Ink(
           padding: const EdgeInsets.fromLTRB(14, 14, 12, 14),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(18),
-            gradient: const LinearGradient(
-              colors: [Color(0xFFFFFFFF), Color(0xFFF9FCFF)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            border: Border.all(color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.18)),
-            boxShadow: const [
+            borderRadius: BorderRadius.circular(14),
+            color: Colors.white,
+            border: Border.all(color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.14)),
+            boxShadow: [
               BoxShadow(
-                color: Color(0x10000000),
-                blurRadius: 16,
-                offset: Offset(0, 8),
+                color: DogFinderTheme.shadowCard,
+                blurRadius: 12,
+                offset: const Offset(0, 4),
               ),
             ],
           ),
@@ -3423,10 +3617,10 @@ class _RegisterActionCard extends StatelessWidget {
                 width: 42,
                 height: 42,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFE8F5F3),
+                  color: DogFinderTheme.primaryLight.withValues(alpha: 0.5),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(icon, color: const Color(0xFF0F766E), size: 21),
+                child: Icon(icon, color: DogFinderTheme.primary, size: 21),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -3448,7 +3642,7 @@ class _RegisterActionCard extends StatelessWidget {
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right, color: Color(0xFF7D8491)),
+              const Icon(Icons.chevron_right, color: DogFinderTheme.textSecondary),
             ],
           ),
         ),
@@ -3486,31 +3680,31 @@ class _CreateHeaderCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
-          gradient: const LinearGradient(
-            colors: [Color(0xFFE7F7F4), Color(0xFFF0F6FF), Color(0xFFFFF5EC)],
+          borderRadius: BorderRadius.circular(16),
+          gradient: LinearGradient(
+            colors: [DogFinderTheme.primaryLight.withValues(alpha: 0.2), DogFinderTheme.secondary.withValues(alpha: 0.24)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
-          border: Border.all(color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2)),
-          boxShadow: const [
+          border: Border.all(color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.16)),
+          boxShadow: [
             BoxShadow(
-              color: Color(0x12000000),
-              blurRadius: 20,
-              offset: Offset(0, 10),
+              color: DogFinderTheme.shadowMedium,
+              blurRadius: 12,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
         child: Row(
           children: [
             Container(
-              width: 34,
-              height: 34,
+              width: 32,
+              height: 32,
               decoration: BoxDecoration(
                 color: Colors.white.withValues(alpha: 0.85),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: Icon(icon, size: 18, color: const Color(0xFF0F766E)),
+                child: Icon(icon, size: 18, color: DogFinderTheme.primary),
             ),
             const SizedBox(width: 8),
             Expanded(
@@ -3553,14 +3747,14 @@ class _FormSection extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.94),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.26)),
-        boxShadow: const [
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.22)),
+        boxShadow: [
           BoxShadow(
-            color: Color(0x12000000),
-            blurRadius: 18,
-            offset: Offset(0, 9),
+            color: DogFinderTheme.shadowMedium,
+            blurRadius: 12,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -4693,7 +4887,12 @@ class MyDogsTab extends StatelessWidget {
                                     child: Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        Text(d.name, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+                                        Text(
+                                          d.name,
+                                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                                fontWeight: FontWeight.w800,
+                                              ),
+                                        ),
                                         const SizedBox(height: 2),
                                         Text(
                                           "${d.breed ?? "견종 미상"} · ${_sizeLabel(d.size)} · ${d.colors.join(", ")}",
@@ -4801,7 +5000,7 @@ class DogDetailPage extends StatelessWidget {
           Container(
             height: 190,
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(16),
               color: Theme.of(context).colorScheme.surfaceContainerHigh,
             ),
             alignment: Alignment.center,
@@ -5022,7 +5221,7 @@ class _ColorMultiSelect extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text("색상(다중)", style: TextStyle(fontWeight: FontWeight.w700)),
+        Text("색상(다중)", style: Theme.of(context).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700)),
         const SizedBox(height: 8),
         Wrap(
           spacing: 8,
@@ -5174,7 +5373,10 @@ class _MyActivityTabState extends State<MyActivityTab> {
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      trailing: Text(_fmt(tip.createdAt), style: const TextStyle(fontSize: 12)),
+                      trailing: Text(
+                        _fmt(tip.createdAt),
+                        style: Theme.of(context).textTheme.labelSmall,
+                      ),
                       onTap: post == null
                           ? null
                           : () => Navigator.of(context).push(
@@ -5363,18 +5565,14 @@ class _EmptyState extends StatelessWidget {
           width: 360,
           padding: const EdgeInsets.fromLTRB(18, 20, 18, 18),
           decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFFFFFFFF), Color(0xFFF7FBFF)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.28)),
-            boxShadow: const [
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.24)),
+            boxShadow: [
               BoxShadow(
-                color: Color(0x14000000),
-                blurRadius: 22,
-                offset: Offset(0, 12),
+                color: DogFinderTheme.shadowCard,
+                blurRadius: 14,
+                offset: const Offset(0, 4),
               ),
             ],
           ),
@@ -5385,15 +5583,22 @@ class _EmptyState extends StatelessWidget {
                 width: 52,
                 height: 52,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFE8F5F3),
+                  color: DogFinderTheme.primaryLight.withValues(alpha: 0.45),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.pets_outlined, color: Color(0xFF0F766E)),
-              ),
+                child: const Icon(Icons.pets_outlined, color: DogFinderTheme.primary),
+            ),
               const SizedBox(height: 12),
-              Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+              Text(
+                title,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+              ),
               const SizedBox(height: 8),
-              Text(desc, textAlign: TextAlign.center, style: const TextStyle(height: 1.45)),
+              Text(
+                desc,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(height: 1.45),
+              ),
               const SizedBox(height: 16),
               SizedBox(width: 220, child: FilledButton(onPressed: onPrimary, child: Text(primaryText))),
               if (secondaryText != null && onSecondary != null) ...[
@@ -5428,9 +5633,9 @@ class _EmptyStateInline extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+          Text(title, style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800)),
           const SizedBox(height: 6),
-          Text(desc, style: const TextStyle(height: 1.4)),
+          Text(desc, style: Theme.of(context).textTheme.bodySmall?.copyWith(height: 1.4)),
           const SizedBox(height: 10),
           OutlinedButton.icon(onPressed: onPrimary, icon: const Icon(Icons.add), label: Text(primaryText)),
         ],
@@ -5456,7 +5661,7 @@ class PendingPayloadPanel extends StatelessWidget {
       children: [
         Row(
           children: [
-            const Text("Payload", style: TextStyle(fontWeight: FontWeight.w700)),
+            Text("Payload", style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w700)),
             const Spacer(),
             TextButton.icon(
               onPressed: () => onCopy(),
@@ -5706,7 +5911,7 @@ class _LocationPickerFieldState extends State<_LocationPickerField> {
         ),
         if (_loadingAddress) ...[
           const SizedBox(height: 8),
-          const Text("주소 확인 중...", style: TextStyle(fontSize: 12)),
+          Text("주소 확인 중...", style: Theme.of(context).textTheme.bodySmall),
         ],
       ],
     );
@@ -5788,12 +5993,12 @@ class _MapPickPageState extends State<MapPickPage> {
                 ),
                 MarkerLayer(
                   markers: [
-                    Marker(
-                      point: selected,
-                      width: 40,
-                      height: 40,
-                      child: const Icon(Icons.location_on, color: Colors.red, size: 36),
-                    ),
+	                    Marker(
+	                      point: selected,
+	                      width: 40,
+	                      height: 40,
+	                      child: const Icon(Icons.location_on, color: DogFinderTheme.mapPin, size: 36),
+	                    ),
                   ],
                 ),
               ],
@@ -5809,12 +6014,12 @@ class _MapPickPageState extends State<MapPickPage> {
                     children: [
                       Text(
                         "${selected.latitude.toStringAsFixed(5)}, ${selected.longitude.toStringAsFixed(5)}",
-                        style: const TextStyle(fontWeight: FontWeight.w600),
+                        style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         _resolving ? "주소 확인 중..." : (_address.isEmpty ? "주소를 찾지 못했어요" : _address),
-                        style: const TextStyle(fontSize: 12),
+                        style: Theme.of(context).textTheme.bodySmall,
                       ),
                     ],
                   ),
@@ -5859,7 +6064,10 @@ Future<DateTime?> _pickDateAndTime(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text("시/분 선택", style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+              Text(
+                "시/분 선택",
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+              ),
               const SizedBox(height: 12),
               Row(
                 children: [
@@ -5989,6 +6197,8 @@ class _LoginGateState extends State<_LoginGate> {
   Future<void> _loginWithKakao() async {
     if (_busy) return;
     setState(() => _busy = true);
+    final store = context.readStore();
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
     try {
       const kakaoNativeAppKey = String.fromEnvironment("KAKAO_NATIVE_APP_KEY");
       if (kakaoNativeAppKey.isEmpty) {
@@ -6002,11 +6212,19 @@ class _LoginGateState extends State<_LoginGate> {
       }
       final me = await UserApi.instance.me();
       final name = me.kakaoAccount?.profile?.nickname ?? me.kakaoAccount?.email ?? "카카오 사용자";
+      final err = await store.signInWithSocial(
+        provider: "kakao",
+        displayName: name,
+        providerUserId: me.id.toString(),
+        email: (me.kakaoAccount?.email ?? "").trim(),
+      );
       if (!mounted) return;
-      await context.readStore().signIn("kakao", displayName: name);
+      if (err != null) {
+        throw Exception(err);
+      }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("카카오 로그인 실패: $e")));
+      scaffoldMessenger.showSnackBar(SnackBar(content: Text("카카오 로그인 실패: $e")));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -6015,6 +6233,8 @@ class _LoginGateState extends State<_LoginGate> {
   Future<void> _loginWithNaver() async {
     if (_busy) return;
     setState(() => _busy = true);
+    final store = context.readStore();
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
     try {
       final res = await FlutterNaverLogin.logIn();
       if (res.status != NaverLoginStatus.loggedIn) {
@@ -6022,17 +6242,24 @@ class _LoginGateState extends State<_LoginGate> {
       }
       final account = res.account;
       final name = (account?.nickname ?? "").trim().isNotEmpty
-          ? account!.nickname
+          ? (account?.nickname ?? "").trim()
           : (account?.name ?? "").trim().isNotEmpty
-              ? account!.name
+              ? (account?.name ?? "").trim()
               : (account?.email ?? "").trim().isNotEmpty
-                  ? account!.email
+                  ? (account?.email ?? "").trim()
                   : "네이버 사용자";
+      final err = await store.signInWithSocial(
+        provider: "naver",
+        displayName: name,
+        email: (account?.email ?? "").trim(),
+      );
       if (!mounted) return;
-      await context.readStore().signIn("naver", displayName: name);
+      if (err != null) {
+        throw Exception(err);
+      }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("네이버 로그인 실패: $e")));
+      scaffoldMessenger.showSnackBar(SnackBar(content: Text("네이버 로그인 실패: $e")));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -6098,23 +6325,29 @@ class _LoginGateState extends State<_LoginGate> {
                 ),
               ),
               const SizedBox(height: 12),
-              _FormSection(
-                title: "소셜 로그인",
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    FilledButton.icon(
-                      style: FilledButton.styleFrom(backgroundColor: const Color(0xFFFEE500), foregroundColor: Colors.black),
-                      onPressed: _busy ? null : _loginWithKakao,
-                      icon: const Icon(Icons.chat_bubble_outline),
-                      label: Text(_busy ? "처리 중..." : "카카오톡 로그인"),
-                    ),
+	                _FormSection(
+	                  title: "소셜 로그인",
+	                  child: Column(
+	                    crossAxisAlignment: CrossAxisAlignment.stretch,
+	                    children: [
+	                    FilledButton.icon(
+	                      style: FilledButton.styleFrom(
+	                        backgroundColor: DogFinderTheme.socialKakao,
+	                        foregroundColor: DogFinderTheme.socialKakaoText,
+	                      ),
+	                      onPressed: _busy ? null : _loginWithKakao,
+	                      icon: const Icon(Icons.chat_bubble_outline),
+	                      label: Text(_busy ? "처리 중..." : "카카오톡 로그인"),
+	                    ),
                     const SizedBox(height: 10),
-                    FilledButton.icon(
-                      style: FilledButton.styleFrom(backgroundColor: const Color(0xFF03C75A), foregroundColor: Colors.white),
-                      onPressed: _busy ? null : _loginWithNaver,
-                      icon: const Icon(Icons.account_circle_outlined),
-                      label: const Text("네이버 로그인"),
+	                    FilledButton.icon(
+	                      style: FilledButton.styleFrom(
+                        backgroundColor: DogFinderTheme.socialNaver,
+                        foregroundColor: Colors.white,
+                      ),
+	                      onPressed: _busy ? null : _loginWithNaver,
+	                      icon: const Icon(Icons.account_circle_outlined),
+	                      label: const Text("네이버 로그인"),
                     ),
                     if (kIsWeb ||
                         defaultTargetPlatform == TargetPlatform.windows ||
@@ -6362,7 +6595,10 @@ Future<void> _showPendingOpsSheet(BuildContext context, AppStore store) async {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text("대기 작업 ${ops.length}건", style: const TextStyle(fontWeight: FontWeight.w700)),
+                      Text(
+                        "대기 작업 ${ops.length}건",
+                        style: Theme.of(ctx).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                      ),
                       const SizedBox(height: 6),
                       PendingSheetActionBar(
                         busy: busy,
@@ -6727,7 +6963,7 @@ Future<void> _showPendingOpsSheet(BuildContext context, AppStore store) async {
                           children: [
                             Text(
                               createdAt == null ? "-" : _fmt(createdAt),
-                              style: const TextStyle(fontSize: 12),
+                              style: Theme.of(ctx).textTheme.labelSmall,
                             ),
                             if (!selecting && suspended)
                               IconButton(
@@ -6897,6 +7133,7 @@ String _collarLabel(CollarState s) {
       return "모름";
   }
 }
+
 
 
 

@@ -51,6 +51,17 @@ class _FailingBackendApi implements BackendApi {
   }
 
   @override
+  Future<AuthSession> signInWithSocial({
+    required String provider,
+    required String displayName,
+    String? providerUserId,
+    String? email,
+    String? accessToken,
+  }) {
+    throw Exception("network");
+  }
+
+  @override
   Future<ApiPost> updatePost(String postId, Map<String, dynamic> patch) {
     throw Exception("network");
   }

@@ -8,6 +8,7 @@ import "backend_config.dart";
 class RestBackendApi implements BackendApi {
   final BackendConfig config;
   final http.Client _client;
+  static const Duration _requestTimeout = Duration(seconds: 15);
 
   String? _accessToken;
 
@@ -53,6 +54,33 @@ class RestBackendApi implements BackendApi {
         "email": email,
         "password": password,
       },
+    );
+    final session = AuthSession.fromJson(json);
+    _accessToken = session.accessToken;
+    return session;
+  }
+
+  @override
+  Future<AuthSession> signInWithSocial({
+    required String provider,
+    required String displayName,
+    String? providerUserId,
+    String? email,
+    String? accessToken,
+  }) async {
+    final body = <String, dynamic>{
+      "displayName": displayName,
+      "provider": provider.trim().toLowerCase(),
+      if (providerUserId != null && providerUserId.trim().isNotEmpty) "providerUserId": providerUserId.trim(),
+      if (email != null && email.trim().isNotEmpty) "email": email.trim(),
+      if (accessToken != null && accessToken.trim().isNotEmpty) "accessToken": accessToken.trim(),
+    };
+
+    final normalizedProvider = provider.trim().toLowerCase();
+    final json = await _send(
+      "POST",
+      "/v1/auth/social/$normalizedProvider",
+      body: body,
     );
     final session = AuthSession.fromJson(json);
     _accessToken = session.accessToken;
@@ -159,21 +187,25 @@ class RestBackendApi implements BackendApi {
     late final http.Response response;
     switch (method) {
       case "GET":
-        response = await _client.get(uri, headers: headers);
+        response = await _client.get(uri, headers: headers).timeout(_requestTimeout);
         break;
       case "POST":
-        response = await _client.post(
+        response = await _client
+            .post(
           uri,
           headers: headers,
           body: jsonEncode(body ?? const {}),
-        );
+        )
+            .timeout(_requestTimeout);
         break;
       case "PATCH":
-        response = await _client.patch(
+        response = await _client
+            .patch(
           uri,
           headers: headers,
           body: jsonEncode(body ?? const {}),
-        );
+        )
+            .timeout(_requestTimeout);
         break;
       default:
         throw StateError("Unsupported method: $method");
@@ -189,11 +221,23 @@ class RestBackendApi implements BackendApi {
     final decoded = jsonDecode(response.body);
     if (decoded is Map<String, dynamic>) return decoded;
     if (decoded is Map) return decoded.cast<String, dynamic>();
+    if (decoded is List) {
+      return {
+        "items": decoded.whereType<Map>().map((e) => e.cast<String, dynamic>()).toList(),
+      };
+    }
     return const <String, dynamic>{};
   }
 
-  static List<Map<String, dynamic>> _extractItems(Map<String, dynamic> body) {
-    final raw = body["items"];
+  static List<Map<String, dynamic>> _extractItems(dynamic body) {
+    if (body is List) {
+      return body
+          .whereType<Map>()
+          .map((e) => e.cast<String, dynamic>())
+          .toList();
+    }
+    if (body is! Map<String, dynamic>) return const [];
+    final raw = body["items"] ?? body["data"];
     if (raw is! List) return const [];
     return raw.whereType<Map>().map((e) => e.cast<String, dynamic>()).toList();
   }

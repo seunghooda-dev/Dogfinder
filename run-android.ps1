@@ -1,0 +1,8 @@
+param(
+  [string[]]$DartDefine = @(),
+  [string]$DartDefineString = "",
+  [switch]$KillExisting,
+  [switch]$Release
+)
+
+& "$PSScriptRoot\run-device.ps1" -Device "android" -DartDefine $DartDefine -DartDefineString $DartDefineString -KillExisting:$KillExisting -Release:$Release

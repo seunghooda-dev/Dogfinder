@@ -1,4 +1,4 @@
-# dogfinder
+﻿# dogfinder
 
 Dog sighting/lost report app (Flutter).
 
@@ -66,6 +66,45 @@ flutter pub get
 flutter analyze
 ```
 
+## Run helpers (no cross-terminal interference)
+
+현재 기본 동작은 자동으로 기존 프로세스를 종료하지 않으며, 필요할 때만 `-KillExisting`으로 현재 프로젝트 범위에서만 정리한 뒤 실행합니다.
+
+`run-web.ps1`
+```bash
+.\run-web.ps1
+.\run-web.ps1 -DartDefine @("BACKEND_BASE_URL=http://localhost:3000","KAKAO_NATIVE_APP_KEY=YOUR_KAKAO_NATIVE_APP_KEY")
+.\run-web.ps1 -DartDefineString "BACKEND_BASE_URL=http://localhost:3000;KAKAO_NATIVE_APP_KEY=YOUR_KAKAO_NATIVE_APP_KEY"
+```
+
+`run-android.ps1`
+```bash
+.\run-android.ps1
+.\run-android.ps1 -DartDefine @("BACKEND_BASE_URL=http://localhost:3000")
+.\run-android.ps1 -DartDefineString "BACKEND_BASE_URL=http://localhost:3000;KAKAO_NATIVE_APP_KEY=YOUR_KAKAO_NATIVE_APP_KEY"
+```
+
+`run-ios.ps1`
+```bash
+.\run-ios.ps1
+.\run-ios.ps1 -DartDefine @("BACKEND_BASE_URL=http://localhost:3000")
+.\run-ios.ps1 -DartDefineString "BACKEND_BASE_URL=http://localhost:3000;KAKAO_NATIVE_APP_KEY=YOUR_KAKAO_NATIVE_APP_KEY"
+```
+
+실행 옵션
+- `-Release`: 안드로이드/iOS를 release 모드로 실행
+- `-KillExisting`: 현재 프로젝트 경로(dogfinder)와 관련된 dart/flutter 프로세스만 종료
+- `-DartDefine`: `--dart-define` 값 목록을 전달
+- `-DartDefineString`: `;` 또는 `,`로 구분한 문자열로 다중 define 전달 (cmd에서 사용)
+- 기본 동작은 기존 프로세스 자동 종료 없음
+
+`run-web.bat`, `run-android.bat`, `run-ios.bat`는 PowerShell 스크립트 래퍼입니다.
+
+예시
+```bash
+.\run-web.bat
+.\run-android.bat -DartDefine "BACKEND_BASE_URL=http://localhost:3000"
+```
 ## Firebase push setup (required for real push)
 
 Run with Firebase options:
@@ -132,3 +171,4 @@ flutter run --dart-define=BACKEND_BASE_URL=http://localhost:3000
   - Pending sheet now has multi-select mode with batch actions (retry selected, reactivate selected suspended items, delete selected).
   - In select mode, you can toggle `current filter select all` or `queue-wide select all`, and selection summary is shown.
   - Selected retry toast now reports selected scope result and both selected/total remaining counts.
+

@@ -10,6 +10,14 @@ abstract class BackendApi {
     required String password,
   });
 
+  Future<AuthSession> signInWithSocial({
+    required String provider,
+    required String displayName,
+    String? providerUserId,
+    String? email,
+    String? accessToken,
+  });
+
   Future<List<ApiPost>> listPosts({
     String? type,
     String? status,
